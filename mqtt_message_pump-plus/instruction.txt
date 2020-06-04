@@ -1,0 +1,38 @@
+docker pump EMQX/BEACON+Clickhouse 
+
+Create network
+docker network create mynetwork --subnet=172.180.0.0/24 -o com.docker.network.bridge.name=mynetwork
+
+Create EMQX container(if using beacon, see beaconnetwork/beacon_mbs_p2p/README.txt)
+docker run -dti --name emqx -p 1883:1883 -p 2883:1883 -p 3883:1883 -p 18083:18083 emqx/emqx
+
+Create clickhouse container
+docker run -d --name clickhouse-rawdata-srv --ulimit nofile=262144:262144 --volume=$HOME/some_clickhouse_database:/var/lib/clickhouse yandex/clickhouse-server
+
+Use command to check network bridge info
+docker network inspect bridge
+
+Use network bridge info to modifiy emqx and clickhouse host address in conf ini file as followed
+[source-mqtt]
+hostname=172.17.0.2(might be defferent, see docker network inspect bridege for detail)
+
+[clickhouse]
+hostname=172.17.0.3(same as above)
+port=9000
+
+[monitor-mqtt]
+hostname=172.17.02(same as above)
+
+
+Build new docker container
+docker run -d -it --name iotstream_pump iotstream/pump-plus:01.28.alpine.3.8
+Note: first time build might now work
+Trouble shooting:
+Use docker ps to check if container is working
+If step 1 not working then use docker ps -a to check container ID
+Check container log when it was created and running: docker logs containerID (like following error log)
+Failed reason: that container use initial config.ini file, the configuration inside is different from the configuration that server is actual using
+
+So if previous step won¡¯t work, use following command to remove container and rebuild:
+docker container rm container_id
+docker run -d -it --name iotstream_pump -v <absolute-path-to-configuration-file>:/iotstream/config/pump-plus-emqx-example.ini iotstream/pump-plus
